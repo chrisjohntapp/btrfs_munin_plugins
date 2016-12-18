@@ -1,0 +1,40 @@
+#!/usr/bin/ruby
+
+# btrfs_subvols -- a munin plugin.
+# <chrisjohntapp@gmail.com>
+
+require 'ptools'
+require 'sys-filesystem'
+include Sys
+
+btrfs_bin = File.which('btrfs')
+
+# Probe for btrfs filesystems and create hash.
+btrfs_vols = Hash.new
+Filesystem.mounts { |m|
+  if m.mount_type == 'btrfs'
+    btrfs_vols[m.mount_point] = nil
+  end
+}
+
+# If 'config', show graph structure.
+if ARGV[0] == 'config'
+  puts "graph_title Number of subvolumes per btrfs filesystem"
+  puts "graph_vlabel Number of subvolumes"
+  puts "graph_category disk"
+  btrfs_vols.each { |k,v|
+    puts 'vol_' + k + '.label ' + k
+  }
+  exit 0
+end
+
+# Assign number of subvolumes in each case to hash.
+btrfs_vols.each { |k,v|
+  btrfs_vols[k] = `#{btrfs_bin} subvolume list #{k} | wc -l`.chomp
+}
+
+# Print results.
+btrfs_vols.each { |k,v|
+  puts 'vol_' + k + '.value ' + v
+}
+

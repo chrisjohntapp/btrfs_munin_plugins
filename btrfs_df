@@ -1,0 +1,79 @@
+#!/usr/bin/ruby
+
+# btrfs_df -- a munin plugin.
+# <chrisjohntapp@gmail.com>
+
+require 'ptools'
+require 'sys-filesystem'
+include Sys
+
+class BtrfsVolume
+  attr_accessor :name
+
+  attr_reader :data_type
+  attr_reader :data_total
+  attr_reader :data_used
+  attr_reader :system_type
+  attr_reader :system_total
+  attr_reader :system_used
+  attr_reader :metadata_type
+  attr_reader :metadata_total
+  attr_reader :metadata_used
+  attr_reader :globalreserve_type
+  attr_reader :globalreserve_total
+  attr_reader :globalreserve_used
+
+  def initialize(name, block)
+    @name                = name
+    @data_type           = /Data, (.*):/.match(block)[1]
+    @data_total          = /Data.*total=(\d+)/.match(block)[1]
+    @data_used           = /Data.*used=(\d+)/.match(block)[1]
+    @system_type         = /System, (.*):/.match(block)[1]
+    @system_total        = /System.*total=(\d+)/.match(block)[1]
+    @system_used         = /System.*used=(\d+)/.match(block)[1]
+    @metadata_type       = /Metadata, (.*):/.match(block)[1]
+    @metadata_total      = /Metadata.*total=(\d+)/.match(block)[1]
+    @metadata_used       = /Metadata.*used=(\d+)/.match(block)[1]
+    @globalreserve_type  = /GlobalReserve, (.*):/.match(block)[1]
+    @globalreserve_total = /GlobalReserve.*total=(\d+)/.match(block)[1]
+    @globalreserve_used  = /GlobalReserve.*used=(\d+)/.match(block)[1]
+  end
+end
+
+btrfs_bin = File.which('btrfs')
+getBtrfsInfo = "#{btrfs_bin} filesystem df -m"
+
+btrfs_vols = Array.new
+Filesystem.mounts {|m|
+  if m.mount_type == 'btrfs'
+    btrfs_vols.push(BtrfsVolume.new(m.mount_point, `#{getBtrfsInfo} #{m.mount_point}`))
+  end
+}
+
+if ARGV[0] == 'config'
+  puts "graph_title Space usage information for btrfs filesystems"
+  puts "graph_vlabel MiB"
+  puts "graph_category disk"
+  btrfs_vols.each { |v|
+    puts v.name + '_data_used.label ' + v.name + '_data_used'
+    puts v.name + '_data_total.label ' + v.name + '_data_total'
+    puts v.name + '_system_used.label ' + v.name + '_system_used'
+    puts v.name + '_system_total.label ' + v.name + '_system_total'
+    puts v.name + '_metadata_used.label ' + v.name + '_metadata_used'
+    puts v.name + '_metadata_total.label ' + v.name + '_metadata_total'
+    puts v.name + '_globalreserve_used.label ' + v.name + '_globalreserve_used'
+    puts v.name + '_globalreserve_total.label ' + v.name + '_globalreserve_total'
+  }
+  exit 0
+end
+
+btrfs_vols.each { |v|
+  puts v.name + '_data_used.value ' + v.data_used.to_s
+  puts v.name + '_data_total.value ' + v.data_total.to_s
+  puts v.name + '_system_used.value ' + v.system_used.to_s
+  puts v.name + '_system_total.value ' + v.system_total.to_s
+  puts v.name + '_metadata_used.value ' + v.metadata_used.to_s
+  puts v.name + '_metadata_total.value ' + v.metadata_total.to_s
+  puts v.name + '_globalreserve_used.value ' + v.globalreserve_used.to_s
+  puts v.name + '_globalreserve_total.value ' + v.globalreserve_total.to_s
+}
