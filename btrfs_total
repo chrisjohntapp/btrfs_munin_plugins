@@ -8,51 +8,49 @@ require 'sys-filesystem'
 include Sys
 
 class BtrfsVolume
-  attr_accessor :name
-
+  attr_reader :name
   attr_reader :device_size
-  # attr_reader :device_allocated
-  # attr_reader :device_unallocated
-  # attr_reader :used
   attr_reader :estimated_free
   attr_reader :minimum_free
 
   def initialize(name, block)
-    @name                = name
-    @device_size         = /Device size.*\s(\d+)/.match(block)[1]
-    # @device_allocated    = /Device allocated.*\s(\d+)/.match(block)[1]
-    # @device_unallocated  = /Device unallocated.*\s(\d+)/.match(block)[1]
-    # @used                = /Used.*\s(\d+)/.match(block)[1]
-    @estimated_free      = /estimated.*\s(\d+)\s.*/.match(block)[1]
-    @minimum_free        = /min.*\s(\d+)/.match(block)[1]
+    @name           = name
+    @device_size    = /Device size.*\s(\d+)/.match(block)[1]
+    @estimated_free = /estimated.*\s(\d+)\s.*/.match(block)[1]
+    @minimum_free   = /min.*\s(\d+)/.match(block)[1]
   end
 end
 
-btrfs_bin = File.which('btrfs')
-getBtrfsInfo = "#{btrfs_bin} filesystem usage -b"
+unless btrfs_bin = File.which('btrfs')
+  raise ArgumentError, "Can't find btrfs binary"
+end
 
+# Probe for btrfs filesystems, then create BtrfsVolume instances and push them
+# onto an array.
 btrfs_vols = Array.new
-Filesystem.mounts {|m|
+Filesystem.mounts do |m|
   if m.mount_type == 'btrfs'
-    btrfs_vols.push(BtrfsVolume.new(m.mount_point, `#{getBtrfsInfo} #{m.mount_point}`))
+    bvol = BtrfsVolume.new(m.mount_point, `#{btrfs_bin} filesystem usage -b #{m.mount_point}`)
+    btrfs_vols.push(bvol)
   end
-}
+end
 
+# If 'config', show graph structure.
 if ARGV[0] == 'config'
   puts "graph_title Btrfs disk space used in percent"
   puts "graph_vlabel %"
   puts "graph_category disk"
-  btrfs_vols.each { |v|
+  btrfs_vols.each do |v|
     puts v.name + '_estimated_used.label ' + v.name + '_estimated_used'
     puts v.name + '_maximum_used.label ' + v.name + '_maximum_used'
-  }
+  end
   exit 0
 end
 
-btrfs_vols.each { |v|
+# Print values for each instance.
+btrfs_vols.each do |v|
   estimated_used_pc = 100 - ((v.estimated_free.to_f / v.device_size.to_f) * 100).round(2)
   maximum_used_pc = 100 -((v.minimum_free.to_f / v.device_size.to_f) * 100).round(2)
-
   puts v.name + '_estimated_used' + '.value ' + estimated_used_pc.to_s
   puts v.name + '_maximum_used' + '.value ' + maximum_used_pc.to_s
-}
+end

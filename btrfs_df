@@ -8,8 +8,7 @@ require 'sys-filesystem'
 include Sys
 
 class BtrfsVolume
-  attr_accessor :name
-
+  attr_reader :name
   attr_reader :data_type
   attr_reader :data_total
   attr_reader :data_used
@@ -40,21 +39,26 @@ class BtrfsVolume
   end
 end
 
-btrfs_bin = File.which('btrfs')
-getBtrfsInfo = "#{btrfs_bin} filesystem df -m"
+unless (btrfs_bin = File.which('btrfs'))
+  raise ArgumentError, "Can't find btrfs binary"
+end
 
+# Probe for btrfs filesystems, then create BtrfsVolume instances and push them
+# onto an array.
 btrfs_vols = Array.new
-Filesystem.mounts {|m|
+Filesystem.mounts do |m|
   if m.mount_type == 'btrfs'
-    btrfs_vols.push(BtrfsVolume.new(m.mount_point, `#{getBtrfsInfo} #{m.mount_point}`))
+    bvol = BtrfsVolume.new(m.mount_point, `#{btrfs_bin} filesystem df -m #{m.mount_point}`)
+    btrfs_vols.push(bvol)
   end
-}
+end
 
+# If 'config', show graph structure.
 if ARGV[0] == 'config'
   puts "graph_title Space usage information for btrfs filesystems"
   puts "graph_vlabel MiB"
   puts "graph_category disk"
-  btrfs_vols.each { |v|
+  btrfs_vols.each do |v|
     puts v.name + '_data_used.label ' + v.name + '_data_used'
     puts v.name + '_data_total.label ' + v.name + '_data_total'
     puts v.name + '_system_used.label ' + v.name + '_system_used'
@@ -63,11 +67,12 @@ if ARGV[0] == 'config'
     puts v.name + '_metadata_total.label ' + v.name + '_metadata_total'
     puts v.name + '_globalreserve_used.label ' + v.name + '_globalreserve_used'
     puts v.name + '_globalreserve_total.label ' + v.name + '_globalreserve_total'
-  }
+  end
   exit 0
 end
 
-btrfs_vols.each { |v|
+# Print values for each instance.
+btrfs_vols.each do |v|
   puts v.name + '_data_used.value ' + v.data_used.to_s
   puts v.name + '_data_total.value ' + v.data_total.to_s
   puts v.name + '_system_used.value ' + v.system_used.to_s
@@ -76,4 +81,4 @@ btrfs_vols.each { |v|
   puts v.name + '_metadata_total.value ' + v.metadata_total.to_s
   puts v.name + '_globalreserve_used.value ' + v.globalreserve_used.to_s
   puts v.name + '_globalreserve_total.value ' + v.globalreserve_total.to_s
-}
+end
