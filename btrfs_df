@@ -40,7 +40,7 @@ class BtrfsVolume
 end
 
 unless (btrfs_bin = File.which('btrfs'))
-  raise RuntimeError, "Can't find btrfs binary"
+  raise "Can't find btrfs binary"
 end
 
 # Probe for btrfs filesystems, then create BtrfsVolume instances and push them
