@@ -8,7 +8,7 @@ require 'sys-filesystem'
 include Sys
 
 unless (btrfs_bin = File.which('btrfs'))
-  raise ArgumentError, "Can't find btrfs binary"
+  raise RuntimeError, "Can't find btrfs binary"
 end
 
 # Probe for btrfs filesystems and populate hash keys with their mount points.
