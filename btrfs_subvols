@@ -1,7 +1,6 @@
 #!/usr/bin/ruby
 
 # btrfs_subvols -- a munin plugin.
-# <chrisjohntapp@gmail.com>
 
 require 'ptools'
 require 'sys-filesystem'
